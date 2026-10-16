@@ -48,13 +48,13 @@
     <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <!-- Exact Merault & Fils Logo SVG: Left Blue, Right Orange overlapping top -->
+                <!-- Exact Merault & Fils Logo SVG (Left Blue, Right Orange overlapping top) -->
                 <div class="w-10 h-10 bg-slate-800 border border-slate-700 rounded-xl shadow-lg flex items-center justify-center p-1.5 overflow-hidden">
                     <svg viewBox="0 0 100 100" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                        <!-- Left half in Blue -->
-                        <path d="M 12 95 L 12 25 L 50 65" fill="none" stroke="#1d4ed8" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
-                        <!-- Right half in Orange passing above -->
-                        <path d="M 50 65 L 88 25 L 88 95" fill="none" stroke="#f97316" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+                        <!-- Left leg & diagonal down in Blue -->
+                        <path d="M 12 95 L 12 25 L 50 65 L 71 52" fill="none" stroke="#1d4ed8" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+                        <!-- Right leg & diagonal up in Orange overlapping top -->
+                        <path d="M 18 12 L 50 45 L 88 25 L 88 95" fill="none" stroke="#f97316" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </div>
                 <div>
@@ -96,7 +96,6 @@
             </div>
         </div>
 
-        <!-- 2 Main Stat Cards (Overtime & Deficit) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
             <!-- Overtime Card -->
             <div class="bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-700 flex items-center gap-4">
@@ -288,83 +287,19 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'merault-fils-timetracker';
-        const firebaseConfig = JSON.parse(__firebase_config);
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-
-        let staff = ['Moi-même', 'Jean Dupont', 'Marc Merault'];
-        let entries = [];
+    <script>
+        let staff = JSON.parse(localStorage.getItem('merault_staff')) || ['Moi-même', 'Jean Dupont', 'Marc Merault'];
+        let entries = JSON.parse(localStorage.getItem('merault_entries')) || [];
         let currentFilter = 'all';
         let modalCallback = null;
-        let userId = null;
-
-        let entriesColRef = null;
-        let staffColRef = null;
 
         window.onload = function() {
             const todayStr = new Date().toISOString().split('T')[0];
             document.getElementById('entryDate').value = todayStr;
+            
             onDateChange();
-
-            const initAuth = async () => {
-                try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch (e) {
-                    console.error("Auth error:", e);
-                    await signInAnonymously(auth);
-                }
-            };
-
-            initAuth();
-
-            onAuthStateChanged(auth, (user) => {
-                if (!user) return;
-                userId = user.uid;
-
-                entriesColRef = collection(db, 'artifacts', appId, 'public', 'data', 'entries');
-                staffColRef = collection(db, 'artifacts', appId, 'public', 'data', 'staff');
-
-                onSnapshot(entriesColRef, (snapshot) => {
-                    entries = [];
-                    snapshot.forEach(docSnap => {
-                        entries.push({ id: docSnap.id, ...docSnap.data() });
-                    });
-                    entries.sort((a, b) => new Date(b.date) - new Date(a.date));
-                    updateDashboard();
-                }, (error) => {
-                    console.error("Error fetching entries:", error);
-                });
-
-                onSnapshot(staffColRef, (snapshot) => {
-                    if (!snapshot.empty) {
-                        const loadedStaff = [];
-                        snapshot.forEach(docSnap => {
-                            loadedStaff.push({ firestoreId: docSnap.id, name: docSnap.data().name });
-                        });
-                        staff = loadedStaff.map(s => s.name);
-                    } else {
-                        staff.forEach(name => {
-                            addDoc(staffColRef, { name });
-                        });
-                    }
-                    updateStaffSelectors();
-                    updateDashboard();
-                }, (error) => {
-                    console.error("Error fetching staff:", error);
-                });
-            });
+            updateStaffSelectors();
+            updateDashboard();
         };
 
         function showModal(title, message, iconClass, hasCancel = false, callback = null) {
@@ -383,15 +318,15 @@
             document.getElementById('customModal').classList.remove('hidden');
         }
 
-        window.closeModal = function(result) {
+        function closeModal(result) {
             document.getElementById('customModal').classList.add('hidden');
             if (modalCallback && typeof modalCallback === 'function') {
                 modalCallback(result);
                 modalCallback = null;
             }
-        };
+        }
 
-        window.toggleTheme = function() {
+        function toggleTheme() {
             const html = document.documentElement;
             const icon = document.getElementById('themeIcon');
             if (html.classList.contains('dark')) {
@@ -403,18 +338,18 @@
                 icon.className = 'ph ph-sun text-lg';
                 document.body.className = 'bg-slate-900 text-slate-100 min-h-screen flex flex-col transition-colors duration-200';
             }
-        };
+        }
 
-        window.openStaffModal = function() {
+        function openStaffModal() {
             renderStaffList();
             document.getElementById('staffModal').classList.remove('hidden');
-        };
+        }
 
-        window.closeStaffModal = function() {
+        function closeStaffModal() {
             document.getElementById('staffModal').classList.add('hidden');
             updateStaffSelectors();
             updateDashboard();
-        };
+        }
 
         function renderStaffList() {
             const container = document.getElementById('staffListContainer');
@@ -430,7 +365,7 @@
             });
         }
 
-        window.addStaff = async function() {
+        function addStaff() {
             const input = document.getElementById('newStaffName');
             const name = input.value.trim();
             if (!name) return;
@@ -438,24 +373,23 @@
                 showModal('Erreur', 'Cet employé existe déjà.', 'ph ph-warning text-amber-400');
                 return;
             }
-            if (!userId) return;
-            await addDoc(staffColRef, { name });
+            staff.push(name);
+            localStorage.setItem('merault_staff', JSON.stringify(staff));
             input.value = '';
-        };
+            renderStaffList();
+        }
 
-        window.removeStaff = async function(index) {
+        function removeStaff(index) {
             if (staff.length <= 1) return;
             staff.splice(index, 1);
-            updateStaffSelectors();
+            localStorage.setItem('merault_staff', JSON.stringify(staff));
             renderStaffList();
-        };
+        }
 
         function updateStaffSelectors() {
             const entrySelect = document.getElementById('entryEmployee');
             const dashboardSelect = document.getElementById('dashboardFilter');
             
-            if (!entrySelect || !dashboardSelect) return;
-
             const currentEntryVal = entrySelect.value;
             const currentDashVal = dashboardSelect.value;
 
@@ -471,12 +405,12 @@
             if (currentDashVal === 'all' || staff.includes(currentDashVal)) dashboardSelect.value = currentDashVal;
         }
 
-        window.onDateChange = function() {
+        function onDateChange() {
             const dateVal = document.getElementById('entryDate').value;
             if (!dateVal) return;
             const [year, month, day] = dateVal.split('-').map(Number);
             const dateObj = new Date(year, month - 1, day);
-            const dayOfWeek = dateObj.getDay();
+            const dayOfWeek = dateObj.getDay(); // 5 = Friday
             
             const templateSelect = document.getElementById('entryTemplate');
             if (dayOfWeek === 5) {
@@ -485,9 +419,9 @@
                 templateSelect.value = 'lundi-jeudi';
             }
             applyTemplate();
-        };
+        }
 
-        window.applyTemplate = function() {
+        function applyTemplate() {
             const template = document.getElementById('entryTemplate').value;
             const startInput = document.getElementById('entryStart');
             const endInput = document.getElementById('entryEnd');
@@ -502,13 +436,12 @@
                 endInput.value = '11:30';
                 breakInput.value = '0';
             }
-        };
+        }
 
         function timeToMins(timeStr) {
             if (!timeStr) return 0;
-            const parts = timeStr.split(':').map(Number);
-            if (parts.length < 2) return 0;
-            return parts[0] * 60 + parts[1];
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
         }
 
         function formatMinutes(totalMins) {
@@ -520,10 +453,8 @@
             return `${sign}${h}h ${m < 10 ? '0' : ''}${m}m`;
         }
 
-        window.handleFormSubmit = async function(e) {
+        function handleFormSubmit(e) {
             e.preventDefault();
-            if (!userId) return;
-
             const employee = document.getElementById('entryEmployee').value;
             const date = document.getElementById('entryDate').value;
             const template = document.getElementById('entryTemplate').value;
@@ -546,6 +477,7 @@
             const diffMins = workedMins - targetMins;
 
             const newEntry = {
+                id: Date.now().toString(),
                 employee,
                 date,
                 template,
@@ -555,40 +487,41 @@
                 workedMins,
                 diffMins,
                 extraStr,
-                minusStr,
-                createdAt: Date.now()
+                minusStr
             };
 
-            await addDoc(entriesColRef, newEntry);
+            entries.unshift(newEntry);
+            localStorage.setItem('merault_entries', JSON.stringify(entries));
 
             document.getElementById('entryExtra').value = '';
             document.getElementById('entryMinus').value = '';
 
-            showModal('Succès', 'La journée a été enregistrée avec succès dans le cloud.', 'ph ph-check-circle text-emerald-400');
-        };
+            updateDashboard();
+            showModal('Succès', 'La journée a été enregistrée avec succès.', 'ph ph-check-circle text-emerald-400');
+        }
 
-        window.deleteEntry = async function(id) {
-            showModal('Confirmation', 'Voulez-vous vraiment supprimer cette saisie ?', 'ph ph-question text-amber-400', true, async (confirmed) => {
-                if (confirmed && userId) {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'entries', id));
+        function deleteEntry(id) {
+            showModal('Confirmation', 'Voulez-vous vraiment supprimer cette saisie ?', 'ph ph-question text-amber-400', true, (confirmed) => {
+                if (confirmed) {
+                    entries = entries.filter(e => e.id !== id);
+                    localStorage.setItem('merault_entries', JSON.stringify(entries));
+                    updateDashboard();
                 }
             });
-        };
+        }
 
-        window.confirmClearHistory = function() {
-            showModal('Attention', 'Voulez-vous vraiment vider tout l\'historique ?', 'ph ph-warning text-rose-400', true, async (confirmed) => {
-                if (confirmed && userId) {
-                    for (const entry of entries) {
-                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'entries', entry.id));
-                    }
+        function confirmClearHistory() {
+            showModal('Attention', 'Voulez-vous vraiment vider tout l\'historique ?', 'ph ph-warning text-rose-400', true, (confirmed) => {
+                if (confirmed) {
+                    entries = [];
+                    localStorage.setItem('merault_entries', JSON.stringify(entries));
+                    updateDashboard();
                 }
             });
-        };
+        }
 
-        window.updateDashboard = function() {
-            const filterEl = document.getElementById('dashboardFilter');
-            if (!filterEl) return;
-            currentFilter = filterEl.value;
+        function updateDashboard() {
+            currentFilter = document.getElementById('dashboardFilter').value;
 
             const filteredEntries = currentFilter === 'all' 
                 ? entries 
@@ -601,8 +534,6 @@
 
             const overtimeEl = document.getElementById('statOvertime');
             const deficitEl = document.getElementById('statDeficit');
-
-            if (!overtimeEl || !deficitEl) return;
 
             if (totalDiffMins >= 0) {
                 overtimeEl.innerText = formatMinutes(totalDiffMins);
@@ -618,7 +549,7 @@
 
             renderSummaryTable();
             renderHistoryTable(filteredEntries);
-        };
+        }
 
         function renderSummaryTable() {
             const tbody = document.getElementById('summaryTableBody');
