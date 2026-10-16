@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merault & Fils - Suivi des Heures</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col transition-colors duration-200">
+
+    <div id="customModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl transform transition-all">
+            <div id="modalIcon" class="mb-4 text-3xl"></div>
+            <h3 id="modalTitle" class="text-xl font-bold mb-2"></h3>
+            <p id="modalMessage" class="text-slate-300 text-sm mb-6"></p>
+            <div class="flex justify-end gap-3">
+                <button id="modalCancelBtn" onclick="closeModal(false)" class="hidden px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 font-medium text-sm transition-colors">Annuler</button>
+                <button id="modalConfirmBtn" onclick="closeModal(true)" class="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 font-medium text-sm transition-colors text-white">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <!-- Exact Merault & Fils Logo SVG: Left Blue, Right Orange overlapping top -->
+                <div class="w-10 h-10 bg-slate-800 border border-slate-700 rounded-xl shadow-lg flex items-center justify-center p-1.5 overflow-hidden">
+                    <svg viewBox="0 0 100 100" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Left half in Blue -->
+                        <path d="M 12 95 L 12 25 L 50 65" fill="none" stroke="#1d4ed8" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+                        <!-- Right half in Orange passing above -->
+                        <path d="M 50 65 L 88 25 L 88 95" fill="none" stroke="#f97316" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight flex items-center gap-2">
+                        Merault & Fils
+                    </h1>
+                    <p class="text-xs text-slate-400">Suivi des heures & rattrapages</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <!-- Staff Management Button -->
+                <button onclick="openStaffModal()" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3.5 py-2 rounded-xl text-sm font-medium transition-colors">
+                    <i class="ph ph-users text-lg text-brand-400"></i>
+                    <span class="hidden sm:inline">Équipe</span>
+                </button>
+
+                <!-- Dark Mode Toggle -->
+                <button onclick="toggleTheme()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 p-2.5 rounded-xl text-slate-300 hover:text-white transition-colors">
+                    <i id="themeIcon" class="ph ph-sun text-lg"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex-grow w-full">
+
+        <!-- Dashboard Header & Filter -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+            <div>
+                <h2 class="text-2xl font-bold">Tableau de bord</h2>
+                <p class="text-slate-400 text-sm mt-1">Lundi-Jeudi (8h45) | Vendredi (4h)</p>
+            </div>
+            
+            <div class="w-full sm:w-auto">
+                <select id="dashboardFilter" onchange="updateDashboard()" class="w-full sm:w-auto bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                    <option value="all">Tous les employés</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 2 Main Stat Cards (Overtime & Deficit) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+            <!-- Overtime Card -->
+            <div class="bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-700 flex items-center gap-4">
+                <div class="bg-emerald-500/10 p-4 rounded-2xl text-emerald-400 border border-emerald-500/20">
+                    <i class="ph ph-trend-up text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-400">Solde Heures Supp.</p>
+                    <h3 id="statOvertime" class="text-2xl font-bold text-emerald-400 mt-0.5">+0h 00m</h3>
+                </div>
+            </div>
+
+            <!-- Deficit Card -->
+            <div class="bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-700 flex items-center gap-4">
+                <div class="bg-rose-500/10 p-4 rounded-2xl text-rose-400 border border-rose-500/20">
+                    <i class="ph ph-trend-down text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-400">Heures à rattraper</p>
+                    <h3 id="statDeficit" class="text-2xl font-bold text-rose-400 mt-0.5">0h 00m</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-slate-800 rounded-2xl shadow-sm border border-slate-700 p-6 mb-10">
+            <h3 class="text-lg font-semibold mb-6 flex items-center gap-2">
+                <i class="ph ph-note-pencil text-brand-400 text-xl"></i>
+                Saisie Manuelle
+            </h3>
+
+            <form id="entryForm" onsubmit="handleFormSubmit(event)" class="space-y-5">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                    <!-- Employee Selector -->
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Employé</label>
+                        <select id="entryEmployee" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+
+                    <!-- Date Selector -->
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Date</label>
+                        <input type="date" id="entryDate" required onchange="onDateChange()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                    </div>
+
+                    <!-- Template Selector -->
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Modèle d'horaires</label>
+                        <select id="entryTemplate" onchange="applyTemplate()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                            <option value="lundi-jeudi">Lundi - Jeudi (7h30 - 17h00)</option>
+                            <option value="vendredi">Vendredi (7h30 - 11h30)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-2">
+                    <!-- Start Time -->
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Arrivée</label>
+                        <input type="time" id="entryStart" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                    </div>
+
+                    <!-- End Time -->
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Départ</label>
+                        <input type="time" id="entryEnd" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                    </div>
+
+                    <!-- Break Duration -->
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Pause (min)</label>
+                        <input type="number" id="entryBreak" min="0" max="180" value="45" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                    </div>
+                </div>
+
+                <!-- Extra / Minus Optional Fields -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-3 border-t border-slate-700/60">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-emerald-400 mb-2 flex items-center gap-1.5">
+                            <i class="ph ph-plus-circle text-base"></i> Ajustement : Heures en plus (Optionnel)
+                        </label>
+                        <input type="time" id="entryExtra" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none text-sm">
+                        <p class="text-xs text-slate-500 mt-1">Optionnel (Ex: 01:30 pour 1h30 ajoutée)</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-rose-400 mb-2 flex items-center gap-1.5">
+                            <i class="ph ph-minus-circle text-base"></i> Ajustement : Heures en moins (Optionnel)
+                        </label>
+                        <input type="time" id="entryMinus" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-rose-500 outline-none text-sm">
+                        <p class="text-xs text-slate-500 mt-1">Optionnel (Ex: 02:00 pour 2h00 déduite)</p>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-4">
+                    <button type="submit" class="w-full bg-brand-600 hover:bg-brand-500 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg shadow-brand-600/20 flex items-center justify-center gap-2">
+                        <i class="ph ph-check-circle text-xl"></i>
+                        Enregistrer la journée
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="bg-slate-800 rounded-2xl shadow-sm border border-slate-700 overflow-hidden mb-10">
+            <div class="p-6 border-b border-slate-700 flex justify-between items-center">
+                <h3 class="text-lg font-semibold flex items-center gap-2">
+                    <i class="ph ph-users-three text-brand-400 text-xl"></i>
+                    Bilan de l'équipe (Global)
+                </h3>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-900/50 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                            <th class="px-6 py-4">Employé</th>
+                            <th class="px-6 py-4">Solde Global (Supp / Déficit)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryTableBody" class="divide-y divide-slate-700 text-sm">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-slate-800 rounded-2xl shadow-sm border border-slate-700 overflow-hidden">
+            <div class="p-6 border-b border-slate-700 flex justify-between items-center">
+                <h3 class="text-lg font-semibold flex items-center gap-2">
+                    <i class="ph ph-clock-counter-clockwise text-brand-400 text-xl"></i>
+                    Historique des Saisies
+                </h3>
+                <button onclick="confirmClearHistory()" class="text-xs font-medium text-rose-400 hover:text-rose-300 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1.5">
+                    <i class="ph ph-trash text-sm"></i> Vider
+                </button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-900/50 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                            <th class="px-6 py-4">Date</th>
+                            <th class="px-6 py-4">Employé</th>
+                            <th class="px-6 py-4">Horaires</th>
+                            <th class="px-6 py-4">Total Heures</th>
+                            <th class="px-6 py-4">Écart (Heures Supp)</th>
+                            <th class="px-6 py-4 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody" class="divide-y divide-slate-700 text-sm">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="staffModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold flex items-center gap-2">
+                    <i class="ph ph-users text-brand-400"></i> Gestion du personnel
+                </h3>
+                <button onclick="closeStaffModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 mb-6">
+                <div class="flex gap-2">
+                    <input type="text" id="newStaffName" placeholder="Nom du nouvel employé..." class="flex-grow bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500">
+                    <button onclick="addStaff()" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors">Ajouter</button>
+                </div>
+            </div>
+
+            <div class="border-t border-slate-700 pt-4">
+                <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Employés enregistrés</h4>
+                <div id="staffListContainer" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-6 border-t border-slate-700 mt-6">
+                <button onclick="closeStaffModal()" class="bg-slate-700 hover:bg-slate-600 px-5 py-2 rounded-xl text-sm font-medium transition-colors">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'merault-fils-timetracker';
+        const firebaseConfig = JSON.parse(__firebase_config);
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let staff = ['Moi-même', 'Jean Dupont', 'Marc Merault'];
+        let entries = [];
+        let currentFilter = 'all';
+        let modalCallback = null;
+        let userId = null;
+
+        let entriesColRef = null;
+        let staffColRef = null;
+
+        window.onload = function() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            document.getElementById('entryDate').value = todayStr;
+            onDateChange();
+
+            const initAuth = async () => {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (e) {
+                    console.error("Auth error:", e);
+                    await signInAnonymously(auth);
+                }
+            };
+
+            initAuth();
+
+            onAuthStateChanged(auth, (user) => {
+                if (!user) return;
+                userId = user.uid;
+
+                entriesColRef = collection(db, 'artifacts', appId, 'public', 'data', 'entries');
+                staffColRef = collection(db, 'artifacts', appId, 'public', 'data', 'staff');
+
+                onSnapshot(entriesColRef, (snapshot) => {
+                    entries = [];
+                    snapshot.forEach(docSnap => {
+                        entries.push({ id: docSnap.id, ...docSnap.data() });
+                    });
+                    entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    updateDashboard();
+                }, (error) => {
+                    console.error("Error fetching entries:", error);
+                });
+
+                onSnapshot(staffColRef, (snapshot) => {
+                    if (!snapshot.empty) {
+                        const loadedStaff = [];
+                        snapshot.forEach(docSnap => {
+                            loadedStaff.push({ firestoreId: docSnap.id, name: docSnap.data().name });
+                        });
+                        staff = loadedStaff.map(s => s.name);
+                    } else {
+                        staff.forEach(name => {
+                            addDoc(staffColRef, { name });
+                        });
+                    }
+                    updateStaffSelectors();
+                    updateDashboard();
+                }, (error) => {
+                    console.error("Error fetching staff:", error);
+                });
+            });
+        };
+
+        function showModal(title, message, iconClass, hasCancel = false, callback = null) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMessage').innerText = message;
+            document.getElementById('modalIcon').innerHTML = `<i class="${iconClass}"></i>`;
+            
+            const cancelBtn = document.getElementById('modalCancelBtn');
+            if (hasCancel) {
+                cancelBtn.classList.remove('hidden');
+            } else {
+                cancelBtn.classList.add('hidden');
+            }
+
+            modalCallback = callback;
+            document.getElementById('customModal').classList.remove('hidden');
+        }
+
+        window.closeModal = function(result) {
+            document.getElementById('customModal').classList.add('hidden');
+            if (modalCallback && typeof modalCallback === 'function') {
+                modalCallback(result);
+                modalCallback = null;
+            }
+        };
+
+        window.toggleTheme = function() {
+            const html = document.documentElement;
+            const icon = document.getElementById('themeIcon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                icon.className = 'ph ph-moon text-lg';
+                document.body.className = 'bg-slate-100 text-slate-800 min-h-screen flex flex-col transition-colors duration-200';
+            } else {
+                html.classList.add('dark');
+                icon.className = 'ph ph-sun text-lg';
+                document.body.className = 'bg-slate-900 text-slate-100 min-h-screen flex flex-col transition-colors duration-200';
+            }
+        };
+
+        window.openStaffModal = function() {
+            renderStaffList();
+            document.getElementById('staffModal').classList.remove('hidden');
+        };
+
+        window.closeStaffModal = function() {
+            document.getElementById('staffModal').classList.add('hidden');
+            updateStaffSelectors();
+            updateDashboard();
+        };
+
+        function renderStaffList() {
+            const container = document.getElementById('staffListContainer');
+            container.innerHTML = '';
+            staff.forEach((name, index) => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center bg-slate-900 px-3.5 py-2.5 rounded-xl border border-slate-700 text-sm';
+                div.innerHTML = `
+                    <span class="font-medium">${name}</span>
+                    ${staff.length > 1 ? `<button onclick="removeStaff(${index})" class="text-rose-400 hover:text-rose-300"><i class="ph ph-trash text-base"></i></button>` : '<span class="text-xs text-slate-500">Défaut</span>'}
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        window.addStaff = async function() {
+            const input = document.getElementById('newStaffName');
+            const name = input.value.trim();
+            if (!name) return;
+            if (staff.includes(name)) {
+                showModal('Erreur', 'Cet employé existe déjà.', 'ph ph-warning text-amber-400');
+                return;
+            }
+            if (!userId) return;
+            await addDoc(staffColRef, { name });
+            input.value = '';
+        };
+
+        window.removeStaff = async function(index) {
+            if (staff.length <= 1) return;
+            staff.splice(index, 1);
+            updateStaffSelectors();
+            renderStaffList();
+        };
+
+        function updateStaffSelectors() {
+            const entrySelect = document.getElementById('entryEmployee');
+            const dashboardSelect = document.getElementById('dashboardFilter');
+            
+            if (!entrySelect || !dashboardSelect) return;
+
+            const currentEntryVal = entrySelect.value;
+            const currentDashVal = dashboardSelect.value;
+
+            entrySelect.innerHTML = '';
+            dashboardSelect.innerHTML = '<option value="all">Tous les employés</option>';
+
+            staff.forEach(name => {
+                entrySelect.innerHTML += `<option value="${name}">${name}</option>`;
+                dashboardSelect.innerHTML += `<option value="${name}">${name}</option>`;
+            });
+
+            if (staff.includes(currentEntryVal)) entrySelect.value = currentEntryVal;
+            if (currentDashVal === 'all' || staff.includes(currentDashVal)) dashboardSelect.value = currentDashVal;
+        }
+
+        window.onDateChange = function() {
+            const dateVal = document.getElementById('entryDate').value;
+            if (!dateVal) return;
+            const [year, month, day] = dateVal.split('-').map(Number);
+            const dateObj = new Date(year, month - 1, day);
+            const dayOfWeek = dateObj.getDay();
+            
+            const templateSelect = document.getElementById('entryTemplate');
+            if (dayOfWeek === 5) {
+                templateSelect.value = 'vendredi';
+            } else {
+                templateSelect.value = 'lundi-jeudi';
+            }
+            applyTemplate();
+        };
+
+        window.applyTemplate = function() {
+            const template = document.getElementById('entryTemplate').value;
+            const startInput = document.getElementById('entryStart');
+            const endInput = document.getElementById('entryEnd');
+            const breakInput = document.getElementById('entryBreak');
+
+            if (template === 'lundi-jeudi') {
+                startInput.value = '07:30';
+                endInput.value = '17:00';
+                breakInput.value = '45';
+            } else if (template === 'vendredi') {
+                startInput.value = '07:30';
+                endInput.value = '11:30';
+                breakInput.value = '0';
+            }
+        };
+
+        function timeToMins(timeStr) {
+            if (!timeStr) return 0;
+            const parts = timeStr.split(':').map(Number);
+            if (parts.length < 2) return 0;
+            return parts[0] * 60 + parts[1];
+        }
+
+        function formatMinutes(totalMins) {
+            const isNeg = totalMins < 0;
+            let absMins = Math.abs(totalMins);
+            const h = Math.floor(absMins / 60);
+            const m = absMins % 60;
+            const sign = isNeg ? '-' : '+';
+            return `${sign}${h}h ${m < 10 ? '0' : ''}${m}m`;
+        }
+
+        window.handleFormSubmit = async function(e) {
+            e.preventDefault();
+            if (!userId) return;
+
+            const employee = document.getElementById('entryEmployee').value;
+            const date = document.getElementById('entryDate').value;
+            const template = document.getElementById('entryTemplate').value;
+            const start = document.getElementById('entryStart').value;
+            const end = document.getElementById('entryEnd').value;
+            const breakMins = parseInt(document.getElementById('entryBreak').value) || 0;
+            const extraStr = document.getElementById('entryExtra').value;
+            const minusStr = document.getElementById('entryMinus').value;
+
+            const startMins = timeToMins(start);
+            const endMins = timeToMins(end);
+            let workedMins = (endMins - startMins) - breakMins;
+            if (workedMins < 0) workedMins = 0;
+
+            const extraMins = timeToMins(extraStr);
+            const minusMins = timeToMins(minusStr);
+            workedMins = workedMins + extraMins - minusMins;
+
+            const targetMins = (template === 'vendredi') ? (4 * 60) : (8 * 60 + 45);
+            const diffMins = workedMins - targetMins;
+
+            const newEntry = {
+                employee,
+                date,
+                template,
+                start,
+                end,
+                breakMins,
+                workedMins,
+                diffMins,
+                extraStr,
+                minusStr,
+                createdAt: Date.now()
+            };
+
+            await addDoc(entriesColRef, newEntry);
+
+            document.getElementById('entryExtra').value = '';
+            document.getElementById('entryMinus').value = '';
+
+            showModal('Succès', 'La journée a été enregistrée avec succès dans le cloud.', 'ph ph-check-circle text-emerald-400');
+        };
+
+        window.deleteEntry = async function(id) {
+            showModal('Confirmation', 'Voulez-vous vraiment supprimer cette saisie ?', 'ph ph-question text-amber-400', true, async (confirmed) => {
+                if (confirmed && userId) {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'entries', id));
+                }
+            });
+        };
+
+        window.confirmClearHistory = function() {
+            showModal('Attention', 'Voulez-vous vraiment vider tout l\'historique ?', 'ph ph-warning text-rose-400', true, async (confirmed) => {
+                if (confirmed && userId) {
+                    for (const entry of entries) {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'entries', entry.id));
+                    }
+                }
+            });
+        };
+
+        window.updateDashboard = function() {
+            const filterEl = document.getElementById('dashboardFilter');
+            if (!filterEl) return;
+            currentFilter = filterEl.value;
+
+            const filteredEntries = currentFilter === 'all' 
+                ? entries 
+                : entries.filter(e => e.employee === currentFilter);
+
+            let totalDiffMins = 0;
+            filteredEntries.forEach(e => {
+                totalDiffMins += e.diffMins || 0;
+            });
+
+            const overtimeEl = document.getElementById('statOvertime');
+            const deficitEl = document.getElementById('statDeficit');
+
+            if (!overtimeEl || !deficitEl) return;
+
+            if (totalDiffMins >= 0) {
+                overtimeEl.innerText = formatMinutes(totalDiffMins);
+                overtimeEl.className = 'text-2xl font-bold text-emerald-400 mt-0.5';
+                deficitEl.innerText = '0h 00m';
+                deficitEl.className = 'text-2xl font-bold text-slate-400 mt-0.5';
+            } else {
+                overtimeEl.innerText = '+0h 00m';
+                overtimeEl.className = 'text-2xl font-bold text-slate-400 mt-0.5';
+                deficitEl.innerText = formatMinutes(totalDiffMins);
+                deficitEl.className = 'text-2xl font-bold text-rose-400 mt-0.5';
+            }
+
+            renderSummaryTable();
+            renderHistoryTable(filteredEntries);
+        };
+
+        function renderSummaryTable() {
+            const tbody = document.getElementById('summaryTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (staff.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="2" class="px-6 py-8 text-center text-slate-400">Aucun employé dans l\'équipe.</td></tr>';
+                return;
+            }
+
+            const summary = {};
+            staff.forEach(name => {
+                summary[name] = { diffMins: 0 };
+            });
+
+            entries.forEach(e => {
+                if (summary[e.employee]) {
+                    summary[e.employee].diffMins += e.diffMins || 0;
+                }
+            });
+
+            staff.forEach(name => {
+                const data = summary[name];
+                let diffClass = 'text-slate-400 bg-slate-900 border border-slate-700';
+                let diffStr = formatMinutes(data.diffMins);
+                
+                if (data.diffMins > 0) {
+                    diffClass = 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20';
+                } else if (data.diffMins < 0) {
+                    diffClass = 'text-rose-400 bg-rose-500/10 border border-rose-500/20';
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-900/30 transition-colors';
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap font-medium">${name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold ${diffClass}">${diffStr}</span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderHistoryTable(dataEntries) {
+            const tbody = document.getElementById('historyTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (dataEntries.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-400">Aucune saisie enregistrée.</td></tr>';
+                return;
+            }
+
+            dataEntries.forEach(e => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-900/30 transition-colors';
+
+                let diffBadgeClass = 'bg-slate-900 text-slate-400 border border-slate-700';
+                let diffStr = formatMinutes(e.diffMins);
+                if (e.diffMins > 0) {
+                    diffBadgeClass = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+                } else if (e.diffMins < 0) {
+                    diffBadgeClass = 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+                }
+
+                let extraMinusNotes = '';
+                if (e.extraStr) extraMinusNotes += `<br><span class="text-xs text-emerald-400">+ ${e.extraStr} (Ajout)</span>`;
+                if (e.minusStr) extraMinusNotes += `<br><span class="text-xs text-rose-400">- ${e.minusStr} (Retrait)</span>`;
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap font-medium">${e.date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${e.employee}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${e.start} - ${e.end}${extraMinusNotes}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${Math.floor(e.workedMins / 60)}h ${e.workedMins % 60}m</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${diffBadgeClass}">${diffStr}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right">
+                        <button onclick="deleteEntry('${e.id}')" class="text-slate-400 hover:text-rose-400 transition-colors p-2 rounded-lg hover:bg-rose-500/10">
+                            <i class="ph ph-trash text-base"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>
